@@ -84,8 +84,11 @@ function Convert-LogonHoursToHumanReadable {
         [byte[]]$LogonHourAttribute,
 
         [Parameter(Mandatory=$false,Position=2)]
-        [ValidateSet("String","Hashtable")]
-        [string]$Output = "Hashtable"
+        [ValidateSet("String","HTML","Hashtable")]
+        [string]$Output = "Hashtable",
+
+        [Parameter(Mandatory=$false,Position=3)]
+        [switch]$OnlyAllowed = $false
     )
 
     Begin{
@@ -134,16 +137,22 @@ function Convert-LogonHoursToHumanReadable {
                 if($localTimeHours[$j] -eq "0"){$canLogon = $false}
                 else{$canLogon = $true}
                 $hourIndex = $j-$k
-                $readableHours.Add(("{0}-{1}" -f $hourIndex, ([int]$hourIndex+1)),$canLogon)
+                if($OnlyAllowed){
+                    if($canLogon){
+                        $readableHours.Add(("{0}-{1}" -f $hourIndex, ([int]$hourIndex+1)),$canLogon)
+                    }
+                }
+                else{
+                    $readableHours.Add(("{0}-{1}" -f $hourIndex, ([int]$hourIndex+1)),$canLogon)
+                }
             }
             #add it to the correct day
             $LogonHoursParsed.Add($days[$i/3],$readableHours)
         }
     }
     End{
-        # ideally... would create something to go from hashtable -> html table
         switch ($Output) {
-            "string" {
+            "String" {
                 $LogonHoursString = ''; 
                 foreach($key in $LogonHoursParsed.Keys){
                     $LogonHoursString += "$key`n";
@@ -155,6 +164,18 @@ function Convert-LogonHoursToHumanReadable {
                     $LogonHoursString += "`n"
                 }
                 return $LogonHoursString
+            }
+            "HTML" {
+                $LogonHoursHtml = "<head><style>table, th, td {border: 1px solid black;border-collapse: collapse;}</style></head>"
+                foreach($key in $LogonHoursParsed.Keys){
+                    $LogonHoursHtml += "<table><caption>$key</caption>"
+                    $LogonHoursHtml += "<tr><th>Hours</th><th>CanLogon?</th></tr>"
+                    foreach($hour in $LogonHoursParsed.$key.Keys){
+                        $LogonHoursHtml += "<tr><td>$hour</td><td>$($LogonHoursParsed.$key.$hour)</td></tr>"
+                    }; 
+                    $LogonHoursHtml += "</table>"
+                }
+                return $LogonHoursHtml
             }
             Default {
                 return $LogonHoursParsed
