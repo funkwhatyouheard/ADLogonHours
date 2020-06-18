@@ -44,19 +44,8 @@
         foreach($user in $currentState.GetEnumerator()){
             $sam = $user.Key
             if ($user.Value -ne $zeroLogonHours -and $null -ne (Compare-Object -ReferenceObject $previousState.$Sam -DifferenceObject $user.Value)){
-                $parsedLogonHours = Convert-LogonHourToHumanReadable -LogonHourAttribute $user.logonhours
-                # ideally... would create something to go from hashtable -> html table
-                $output = ''; 
-                foreach($key in $parsedLogonHours.Keys){
-                    $output += "$key`n";
-                    foreach($hour in $hours.$key.Keys){
-                        $output += "$hour`:"; 
-                        $output += $hours.$key.$hour; 
-                        $output += "`n"
-                    }; 
-                    $output += "`n"
-                }
-                $body = "Logon hours were changed for $user from zero. Details:`n`n$output."
+                $parsedLogonHours = Convert-LogonHoursToHumanReadable -LogonHourAttribute $user.logonhours -Output String
+                $body = "Logon hours were changed for $user from zero. Details:`n`n$parsedLogonHours."
                 Send-MailMessage -From $Sender -To $NotifyEmails -Priority High -Subject "Logon Hours Changed for $($user.SamAccountName)" -SmtpServer $SMTPServer -Body $body
             }
         }
@@ -89,10 +78,14 @@ function Get-ZeroLogonHourAccounts {
     }
 }
 
-function Convert-LogonHourToHumanReadable {
+function Convert-LogonHoursToHumanReadable {
     param(
         [Parameter(Mandatory=$true,Position=1)]
-        [byte[]]$LogonHourAttribute
+        [byte[]]$LogonHourAttribute,
+
+        [Parameter(Mandatory=$false,Position=2)]
+        [ValidateSet("String","Hashtable")]
+        [string]$Output = "Hashtable"
     )
 
     Begin{
@@ -107,7 +100,7 @@ function Convert-LogonHourToHumanReadable {
         # 16-18 = Friday
         # 19-21 = Saturday
 
-        $LogonHourParsed = [ordered]@{}
+        $LogonHoursParsed = [ordered]@{}
         $days = @("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")
         $Bias = (Get-ItemProperty -Path HKLM:\System\CurrentControlSet\Control\TimeZoneInformation).Bias
         If ($Bias -gt 10080){$Bias = $Bias - 4294967296} 
@@ -144,11 +137,29 @@ function Convert-LogonHourToHumanReadable {
                 $readableHours.Add(("{0}-{1}" -f $hourIndex, ([int]$hourIndex+1)),$canLogon)
             }
             #add it to the correct day
-            $LogonHourParsed.Add($days[$i/3],$readableHours)
+            $LogonHoursParsed.Add($days[$i/3],$readableHours)
         }
     }
     End{
-        return $LogonHourParsed
+        # ideally... would create something to go from hashtable -> html table
+        switch ($Output) {
+            "string" {
+                $LogonHoursString = ''; 
+                foreach($key in $LogonHoursParsed.Keys){
+                    $LogonHoursString += "$key`n";
+                    foreach($hour in $LogonHoursParsed.$key.Keys){
+                        $LogonHoursString += "$hour`:"; 
+                        $LogonHoursString += $LogonHoursParsed.$key.$hour; 
+                        $LogonHoursString += "`n"
+                    }; 
+                    $LogonHoursString += "`n"
+                }
+                return $LogonHoursString
+            }
+            Default {
+                return $LogonHoursParsed
+            }
+        }
     }
 }
 
