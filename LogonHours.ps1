@@ -44,9 +44,8 @@
         foreach($user in $currentState.GetEnumerator()){
             $sam = $user.Key
             if ($user.Value -ne $zeroLogonHours -and $null -ne (Compare-Object -ReferenceObject $previousState.$Sam -DifferenceObject $user.Value)){
-                $parsedLogonHours = Convert-LogonHoursToHumanReadable -LogonHourAttribute $user.logonhours -Output String
-                $body = "Logon hours were changed for $user from zero. Details:`n`n$parsedLogonHours."
-                Send-MailMessage -From $Sender -To $NotifyEmails -Priority High -Subject "Logon Hours Changed for $($user.SamAccountName)" -SmtpServer $SMTPServer -Body $body
+                $parsedLogonHours = Convert-LogonHoursToHumanReadable -LogonHourAttribute $user.logonhours -Output HTML -OnlyAllowed
+                Send-MailMessage -From $Sender -To $NotifyEmails -Priority High -Subject "Logon Hours Changed for $($user.SamAccountName)" -SmtpServer $SMTPServer -Body $parsedLogonHours
             }
         }
     }
